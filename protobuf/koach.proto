@@ -1,0 +1,62 @@
+syntax = "proto3";
+
+package proto;
+
+option go_package = "github.com/kubearmor/koach/protobuf";
+
+message Duration {
+    int64 year = 1;
+    int64 month = 2;
+    int64 week = 3;
+    int64 day = 4;
+    int64 hour = 5;
+    int64 minute = 6;
+    int64 second = 7;
+}
+
+message FileAccessData {
+    string path = 1;
+}
+
+message ProcessSpawnData {
+    string user = 1;
+    string command = 2;
+}
+
+message NetworkCallData {
+    string protocol = 1;
+    string address = 2;
+}
+
+message ObservabilityData {
+    string namespace_id = 1;
+    string deployment_id = 2;
+    string node_id = 3;
+    string pod_id = 4;
+    string container_id = 5;
+    string operation_type = 6;
+    string created_at = 7;
+    oneof operation_data {
+        FileAccessData file = 8;
+        ProcessSpawnData process = 9;
+        NetworkCallData network = 10;
+    }
+}
+
+message GetRequest {
+    string namespace_id = 1;
+    string deployment_id = 2;
+    string node_id = 3;
+    string pod_id = 4;
+    string container_id = 5;
+    string operation_type = 6;
+    Duration time = 7;
+}
+
+message GetResponse {
+    repeated ObservabilityData data = 1;
+}
+
+service ObservabilityService {
+    rpc Get(GetRequest) returns (GetResponse);
+}
