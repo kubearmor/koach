@@ -6,6 +6,8 @@ import (
 	"os/signal"
 	"syscall"
 
+	"github.com/kubearmor/koach/koach/config"
+	"github.com/kubearmor/koach/koach/database"
 	kg "github.com/kubearmor/koach/koach/log"
 	"github.com/kubearmor/koach/koach/server"
 )
@@ -41,12 +43,31 @@ func GetOSSigChannel() chan os.Signal {
 // ========== //
 
 func main() {
+	// init config
+	config.InitConfig()
+
 	// get arguments
 	gRPCPortPtr := flag.String("gRPCPort", "32767", "gRPC port")
+	migrateDBPtr := flag.Bool("migrate", true, "migrate database")
 	flag.Parse()
 
+	// init database
+	err := database.InitDatabase(config.C.Database)
+	if err != nil {
+		kg.Errf("Failed to intizialize database")
+		return
+	}
+
+	if *migrateDBPtr {
+		err := database.MigrateDatabase()
+		if err != nil {
+			kg.Errf("Failed to migrate database")
+			return
+		}
+	}
+
 	// create koach server
-	koachServer := server.NewKoachServer(*gRPCPortPtr)
+	koachServer := server.NewKoachServer(*gRPCPortPtr, database.DB)
 	if koachServer == nil {
 		kg.Warnf("Failed to create a koach server (:%s)", *gRPCPortPtr)
 		return
