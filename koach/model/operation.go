@@ -3,9 +3,9 @@ package model
 type Operation string
 
 const (
-	OperationFileAccess   Operation = "FILE_ACCESS"
-	OperationProcessSpawn Operation = "PROCESS_SPAWN"
-	OperationNetworkCall  Operation = "NETWORK_CALL"
+	OperationFileAccess   Operation = "File"
+	OperationProcessSpawn Operation = "Process"
+	OperationNetworkCall  Operation = "Network"
 )
 
 type OperationDetail interface {

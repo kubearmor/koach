@@ -24,9 +24,6 @@ func InitDatabase(databaseConfig config.DatabaseConfig) error {
 func MigrateDatabase() error {
 	err := DB.AutoMigrate(
 		&model.Observability{},
-		&model.FileAccess{},
-		&model.NetworkCall{},
-		&model.ProcessSpawn{},
 	)
 
 	return err

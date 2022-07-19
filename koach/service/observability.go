@@ -1,43 +1,50 @@
 package service
 
 import (
-	"errors"
-
 	"github.com/kubearmor/koach/koach/model"
 	"github.com/kubearmor/koach/koach/repository"
 )
 
 type IObservabilityService interface {
 	Get(filter model.ObservabilityFilter) ([]model.Observability, error)
+	Save(observability model.Observability) error
+	DeleteByAgeSeconds(age int) error
 }
 
 type observabilityService struct {
-	fileAccessRepository   repository.IFileAccessRepository
-	networkCallRepository  repository.INetworkCallRepository
-	processSpawnRepository repository.IProcessSpawnRepository
+	observabilityRepository repository.IObservabilityRepository
 }
 
 func (s *observabilityService) Get(filter model.ObservabilityFilter) ([]model.Observability, error) {
-	switch {
-	case filter.OperationType == model.OperationFileAccess:
-		return s.fileAccessRepository.Get(filter)
-	case filter.OperationType == model.OperationNetworkCall:
-		return s.networkCallRepository.Get(filter)
-	case filter.OperationType == model.OperationProcessSpawn:
-		return s.processSpawnRepository.Get(filter)
+	observabilities, err := s.observabilityRepository.Get(filter)
+	if err != nil {
+		return nil, err
 	}
 
-	return nil, errors.New("unidentified operation type")
+	if filter.Labels != "" {
+		labelsFilter := model.LabelsFilter{}
+		labelsFilter.FromString(filter.Labels)
+
+		observabilities = model.FilterObservabilitiesByFilter(observabilities, labelsFilter)
+	}
+
+	return observabilities, nil
+}
+
+func (s *observabilityService) Save(observability model.Observability) error {
+	_, err := s.observabilityRepository.Save(observability)
+
+	return err
+}
+
+func (s *observabilityService) DeleteByAgeSeconds(age int) error {
+	return s.observabilityRepository.DeleteByAgeSeconds(age)
 }
 
 func NewObservabilityService(
-	fileAccessRepository repository.IFileAccessRepository,
-	networkCallRepository repository.INetworkCallRepository,
-	processSpawnRepository repository.IProcessSpawnRepository,
+	observabilityRepository repository.IObservabilityRepository,
 ) IObservabilityService {
 	return &observabilityService{
-		fileAccessRepository:   fileAccessRepository,
-		networkCallRepository:  networkCallRepository,
-		processSpawnRepository: processSpawnRepository,
+		observabilityRepository: observabilityRepository,
 	}
 }

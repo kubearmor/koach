@@ -47,8 +47,9 @@ func main() {
 	config.InitConfig()
 
 	// get arguments
-	gRPCPortPtr := flag.String("gRPCPort", "32767", "gRPC port")
-	migrateDBPtr := flag.Bool("migrate", true, "migrate database")
+	gRPCPortPtr := flag.String("gRPCPort", "3001", "gRPC port")
+	migrateDBPtr := flag.Bool("migrate", false, "migrate database")
+	periodicDataDeletionAge := flag.String("periodic-data-deletion-age", "30d", "periodic data deletion age")
 	flag.Parse()
 
 	// init database
@@ -73,6 +74,10 @@ func main() {
 		return
 	}
 	kg.Printf("Created a koach server (:%s)", *gRPCPortPtr)
+
+	go koachServer.GetFeedsFromRelay(config.C.Relay)
+
+	go koachServer.PeriodicDataDeletion(*periodicDataDeletionAge)
 
 	// listen for interrupt signals
 	sigChan := GetOSSigChannel()
