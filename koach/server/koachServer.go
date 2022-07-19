@@ -2,7 +2,6 @@ package server
 
 import (
 	"context"
-	"fmt"
 	"net"
 	"time"
 
@@ -89,23 +88,6 @@ func (ks *KoachServer) WatchLogs() {
 		}
 
 		kg.Printf("Succesfully receive an observability data")
-
-		fmt.Println("---")
-		fmt.Println(log.Operation)
-		fmt.Println("---")
-		fmt.Println("+++ identity +++")
-		fmt.Println(log.ClusterName)
-		fmt.Println(log.NamespaceName)
-		fmt.Println(log.PodName)
-		fmt.Println(log.ContainerName)
-		fmt.Println("+++ data +++")
-		fmt.Println(log.Resource)
-		fmt.Println(log.Source)
-		fmt.Println(log.Data)
-		fmt.Println(log.ProcessName)
-		fmt.Println(log.ProcessName)
-		fmt.Println(log.Result)
-		fmt.Println(log.Type)
 
 		observability := model.Observability{
 			ClusterName:       log.ClusterName,
