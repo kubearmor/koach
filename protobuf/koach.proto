@@ -1,0 +1,49 @@
+syntax = "proto3";
+
+package proto;
+
+option go_package = "github.com/kubearmor/koach/protobuf";
+
+message ObservabilityData {
+    string cluster_name = 1;
+    string host_name = 2;
+    string namespace_name = 3;
+    string pod_name = 4;
+    string labels = 5;
+    string container_id = 6;
+    string container_name = 7;
+    string container_image = 8;
+    string parent_process_name = 9;
+    string process_name = 10;
+    int32 host_ppid = 11;
+    int32 host_pid = 12;
+    int32 ppid = 13;
+    int32 pid = 14;
+    int32 uid = 15;
+    string type = 16;
+    string source = 17;
+    string operation = 18;
+    string resource = 19;
+    string data = 20;
+    string result = 21;
+    string created_at = 22;    
+}
+
+message GetRequest {
+    string namespace_id = 1;
+    string deployment_id = 2;
+    string node_id = 3;
+    string pod_id = 4;
+    string container_id = 5;
+    string operation_type = 6;
+    string time = 7;
+    string labels = 8;
+}
+
+message GetResponse {
+    repeated ObservabilityData data = 1;
+}
+
+service ObservabilityService {
+    rpc Get(GetRequest) returns (GetResponse);
+}
