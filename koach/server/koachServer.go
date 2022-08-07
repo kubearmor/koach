@@ -3,8 +3,10 @@ package server
 import (
 	"context"
 	"net"
+	"sync"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/kubearmor/koach/koach/config"
 	kg "github.com/kubearmor/koach/koach/log"
 	"github.com/kubearmor/koach/koach/model"
@@ -12,10 +14,14 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 	"gorm.io/gorm"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
 
 	kubearmor_proto "github.com/kubearmor/KubeArmor/protobuf"
 	"github.com/kubearmor/koach/koach/service"
 	proto "github.com/kubearmor/koach/protobuf"
+
+	koach_api "github.com/kubearmor/koach/pkg/KoachController/api/v1"
 )
 
 // ================== //
@@ -33,10 +39,15 @@ type KoachServer struct {
 	// observability service
 	ObservabilityService service.IObservabilityService
 
-	//
+	// log client
 	LogClient *LogClient
 
 	proto.UnimplementedObservabilityServiceServer
+
+	// alert
+	AlertRules   map[string]koach_api.KubeArmorAlertRuleSpec
+	AlertStructs map[string]model.AlertStruct
+	AlertLock    *sync.RWMutex
 }
 
 // NewKoachServer Function
@@ -72,6 +83,10 @@ func NewKoachServer(port string, db *gorm.DB) *KoachServer {
 			kg.Errf("Failed to serve gRPC server\n")
 		}
 	}()
+
+	ks.AlertRules = map[string]koach_api.KubeArmorAlertRuleSpec{}
+	ks.AlertStructs = map[string]model.AlertStruct{}
+	ks.AlertLock = &sync.RWMutex{}
 
 	return ks
 }
@@ -110,15 +125,17 @@ func (ks *KoachServer) WatchLogs() {
 			Operation:         model.Operation(log.Operation),
 			Resource:          log.Resource,
 			Data:              log.Data,
-			Result:            log.Resource,
+			Result:            log.Result,
 		}
 
-		err := ks.ObservabilityService.Save(observability)
+		err := ks.ObservabilityService.Save(&observability)
 		if err != nil {
 			kg.Errf("Failed to save observability data")
 		}
 
 		kg.Printf("Succesfully save an observability data to DB")
+
+		ks.CheckObservabilityWithAlertRule(observability)
 	}
 }
 
@@ -155,13 +172,88 @@ func (ks *KoachServer) PeriodicDataDeletion(ageString string) {
 	}
 }
 
+func (ks *KoachServer) WatchAlertRule() {
+	watcher := K8s.WatchKubeArmorAlertRules()
+
+	if watcher != nil {
+		for event := range watcher.ResultChan() {
+			if event.Type != "ADDED" && event.Type != "MODIFIED" && event.Type != "DELETED" {
+				continue
+			}
+
+			alertRuleUnstructured, ok := event.Object.(*unstructured.Unstructured)
+			if !ok {
+				continue
+			}
+
+			alertRule := koach_api.KubeArmorAlertRule{}
+
+			err := runtime.DefaultUnstructuredConverter.FromUnstructured(alertRuleUnstructured.UnstructuredContent(), &alertRule)
+			if err != nil {
+				continue
+			}
+
+			switch event.Type {
+			case "ADDED":
+				kg.Printf("Succesfully added an alert rule")
+				ks.AlertRules[string(alertRule.ObjectMeta.UID)] = alertRule.Spec
+			case "MODIFIED":
+				kg.Printf("Succesfully modified an alert rule")
+				ks.AlertRules[string(alertRule.ObjectMeta.UID)] = alertRule.Spec
+			case "DELETED":
+				kg.Printf("Succesfully delete an alert rule")
+				delete(ks.AlertRules, string(alertRule.ObjectMeta.UID))
+			}
+		}
+	} else {
+		kg.Errf("Failed to watch KubeArmorAlertRule")
+	}
+}
+
+func (ks *KoachServer) CheckObservabilityWithAlertRule(observability model.Observability) {
+	for _, alertRule := range ks.AlertRules {
+		isViolatingRule := false
+
+		filter := model.ObservabilityFilter{}
+		filter.FromAlertRule(alertRule, observability)
+
+		if observability.IsValid(filter) {
+			result, err := ks.ObservabilityService.Get(filter)
+			if err != nil {
+				kg.Errf("Error on fetching data while checking with alert rule")
+			}
+
+			isViolatingRule = len(result) >= alertRule.Condition.Occurrence.Count
+		}
+
+		if isViolatingRule {
+			alert := &model.Alert{
+				Message:       alertRule.Message,
+				Severity:      alertRule.Severity,
+				Observability: observability,
+			}
+
+			ks.AlertLock.RLock()
+			for _, alertStruct := range ks.AlertStructs {
+				if alert.IsValid(alertStruct.Filter) {
+					select {
+					case alertStruct.Broadcast <- alert:
+					default:
+					}
+				}
+			}
+			ks.AlertLock.RUnlock()
+		}
+	}
+}
+
 func (ks *KoachServer) Get(ctx context.Context, request *proto.GetRequest) (*proto.GetResponse, error) {
 	observabilityFilter := model.ObservabilityFilter{
 		NamespaceID:      request.GetNamespaceId(),
 		PodID:            request.GetPodId(),
 		ContainerID:      request.GetContainerId(),
 		OperationType:    model.Operation(request.GetOperationType()),
-		Labels:           request.GetLabels(),
+		Labels:           model.LabelsFromString(request.GetLabels()),
 		SinceTimeSeconds: 0,
 	}
 
@@ -216,6 +308,90 @@ func (ks *KoachServer) Get(ctx context.Context, request *proto.GetRequest) (*pro
 	}
 
 	return &response, nil
+}
+
+func (ks *KoachServer) addAlertChans(id string, alertChan chan *model.Alert, filter model.ListenAlertFilter) {
+	ks.AlertLock.Lock()
+	defer ks.AlertLock.Unlock()
+
+	ks.AlertStructs[id] = model.AlertStruct{
+		Filter:    filter,
+		Broadcast: alertChan,
+	}
+
+	kg.Printf("Added a new client (%s) for ListenAlert", id)
+}
+
+func (ks *KoachServer) removeAlertChans(id string) {
+	ks.AlertLock.Lock()
+	defer ks.AlertLock.Unlock()
+
+	delete(ks.AlertStructs, id)
+
+	kg.Printf("Deleted client (%s) for ListenAlert", id)
+}
+
+func (ks *KoachServer) ListenAlert(req *proto.ListenAlertRequest, stream proto.ObservabilityService_ListenAlertServer) error {
+	id := uuid.Must(uuid.NewRandom()).String()
+
+	alertChan := make(chan *model.Alert, 8192)
+	defer close(alertChan)
+
+	alertFilter := model.ListenAlertFilter{
+		NamespaceID: req.NamespaceId,
+		PodID:       req.PodId,
+		ContainerID: req.ContainerId,
+	}
+
+	ks.addAlertChans(id, alertChan, alertFilter)
+	defer ks.removeAlertChans(id)
+
+	for {
+		time.Sleep(time.Second * 1)
+
+		select {
+		case <-stream.Context().Done():
+			return nil
+		case msg, valid := <-alertChan:
+			if !valid {
+				continue
+			}
+
+			alertResponse := proto.ListenAlertResponse{
+				Message:  msg.Message,
+				Severity: int32(msg.Severity),
+				Observability: &proto.ObservabilityData{
+					ClusterName:       msg.Observability.ClusterName,
+					HostName:          msg.Observability.HostName,
+					NamespaceName:     msg.Observability.NamespaceName,
+					PodName:           msg.Observability.PodName,
+					Labels:            msg.Observability.Labels,
+					ContainerId:       msg.Observability.ContainerID,
+					ContainerName:     msg.Observability.ContainerName,
+					ContainerImage:    msg.Observability.ContainerImage,
+					ParentProcessName: msg.Observability.ParentProcessName,
+					ProcessName:       msg.Observability.ProcessName,
+					HostPpid:          msg.Observability.PPID,
+					HostPid:           msg.Observability.HostPID,
+					Ppid:              msg.Observability.PPID,
+					Pid:               msg.Observability.PID,
+					Uid:               msg.Observability.UID,
+					Type:              msg.Observability.Type,
+					Source:            msg.Observability.Source,
+					Operation:         string(msg.Observability.Operation),
+					Resource:          msg.Observability.Resource,
+					Data:              msg.Observability.Data,
+					Result:            msg.Observability.Result,
+					CreatedAt:         msg.Observability.CreatedAt.String(),
+				},
+			}
+
+			if err := stream.Send(&alertResponse); err != nil {
+				return err
+			}
+		default:
+		}
+	}
 }
 
 // DestroyKoachServer Function

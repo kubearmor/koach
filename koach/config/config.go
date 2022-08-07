@@ -33,8 +33,8 @@ func InitConfig() {
 			DatabaseFilePath: getEnvValueString("DATABASE_FILE_PATH", "./database/koach.db"),
 		},
 		Relay: RelayConfig{
-			RelayIP:   getEnvValueString("RELAY_IP", "localhost"),
-			RelayPort: getEnvValueString("RELAY_PORT", "32767"),
+			RelayIP:   getEnvValueString("KUBEARMOR_SERVICE_HOST", "localhost"),
+			RelayPort: getEnvValueString("KUBEARMOR_SERVICE_PORT", "32767"),
 		},
 	}
 }

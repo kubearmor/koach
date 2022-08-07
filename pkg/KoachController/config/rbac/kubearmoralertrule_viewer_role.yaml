@@ -1,0 +1,27 @@
+# permissions for end users to view kubearmoralertrules.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/name: clusterrole
+    app.kubernetes.io/instance: kubearmoralertrule-viewer-role
+    app.kubernetes.io/component: rbac
+    app.kubernetes.io/created-by: koachcontroller
+    app.kubernetes.io/part-of: koachcontroller
+    app.kubernetes.io/managed-by: kustomize
+  name: kubearmoralertrule-viewer-role
+rules:
+- apiGroups:
+  - security.kubearmor.com
+  resources:
+  - kubearmoralertrules
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - security.kubearmor.com
+  resources:
+  - kubearmoralertrules/status
+  verbs:
+  - get

@@ -1,0 +1,12 @@
+apiVersion: security.kubearmor.com/v1
+kind: KubeArmorAlertRule
+metadata:
+  labels:
+    app.kubernetes.io/name: kubearmoralertrule
+    app.kubernetes.io/instance: kubearmoralertrule-sample
+    app.kubernetes.io/part-of: koachcontroller
+    app.kuberentes.io/managed-by: kustomize
+    app.kubernetes.io/created-by: koachcontroller
+  name: kubearmoralertrule-sample
+spec:
+  # TODO(user): Add fields here

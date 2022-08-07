@@ -3,6 +3,10 @@ package model
 import (
 	"regexp"
 	"strings"
+
+	turnip "github.com/nyrahul/turnip/api"
+
+	koach_api "github.com/kubearmor/koach/pkg/KoachController/api/v1"
 )
 
 type Observability struct {
@@ -36,54 +40,156 @@ func (Observability) TableName() string {
 }
 
 type ObservabilityFilter struct {
-	NamespaceID      string
-	PodID            string
-	ContainerID      string
-	OperationType    Operation
-	Labels           string
-	SinceTimeSeconds int
+	NamespaceID                    string
+	PodID                          string
+	ContainerID                    string
+	OperationType                  Operation
+	Labels                         map[string]string
+	PID                            int32
+	SinceTimeSeconds               int
+	ResourceRegex                  string
+	Syscall                        SystemCall
+	NetworkProtocol                string
+	SourceAddressIP                string
+	SourceAddressIsSuspicious      bool
+	DestinationAddressIP           string
+	DestinationAddressIsSuspicious bool
 }
 
-func FilterObservabilitiesByFilter(observabilities []Observability, labelsFilter LabelsFilter) []Observability {
-	filteredObservabilities := []Observability{}
+func (filter *ObservabilityFilter) FromAlertRule(alertRule koach_api.KubeArmorAlertRuleSpec, observability Observability) {
+	filter.Labels = alertRule.Selector.MatchLabels
 
-	for _, observability := range observabilities {
-		observabilityLabel := map[string]string{}
+	if alertRule.Condition.Occurrence.Timeframe != "" {
+		duration := Duration{}
+		duration.FromString(alertRule.Condition.Occurrence.Timeframe)
 
-		for _, label := range strings.Split(observability.Labels, ",") {
-			labelSplit := strings.Split(label, "=")
+		filter.SinceTimeSeconds = duration.GetSeconds()
+	}
 
-			labelKey := labelSplit[0]
-			labelValue := labelSplit[1]
+	if alertRule.Condition.IsSamePID {
+		filter.PID = observability.PID
+	}
 
-			observabilityLabel[labelKey] = labelValue
-		}
+	switch {
+	case alertRule.Operation == string(OperationFileAccess) &&
+		alertRule.Condition.File.Action == string(FileActionDelete):
+		filter.OperationType = OperationSystemCall
+		filter.ResourceRegex = alertRule.Condition.File.Path
+		filter.Syscall = SystemCallUnlinkat
 
-		isObservabilityValid := true
+	case alertRule.Operation == string(OperationNetworkCall):
+		filter.OperationType = OperationNetworkCall
+		filter.NetworkProtocol = alertRule.Condition.Network.Protocol
+		filter.SourceAddressIP = alertRule.Condition.Network.SourceAddress.IP
+		filter.SourceAddressIsSuspicious = alertRule.Condition.Network.SourceAddress.IsSuspicious
+		filter.DestinationAddressIP = alertRule.Condition.Network.DestinationAddress.IP
+		filter.DestinationAddressIsSuspicious = alertRule.Condition.Network.DestinationAddress.IsSuspicious
+	}
+}
 
-		for filterKey, filterValue := range labelsFilter.Filter {
-			labelValue, isLabelKeyExist := observabilityLabel[filterKey]
+func (observability *Observability) IsValid(filter ObservabilityFilter) bool {
+	if observability.Operation != filter.OperationType {
+		return false
+	}
 
-			if !isLabelKeyExist {
-				isObservabilityValid = false
-				break
-			}
-
-			match, _ := regexp.MatchString(filterValue, labelValue)
-			if match {
-				continue
-			}
-
-			if filterValue != labelValue {
-				isObservabilityValid = false
-				break
-			}
-		}
-
-		if isObservabilityValid {
-			filteredObservabilities = append(filteredObservabilities, observability)
+	if filter.ResourceRegex != "" {
+		if match, _ := regexp.MatchString(filter.ResourceRegex, observability.Resource); !match {
+			return false
 		}
 	}
 
-	return filteredObservabilities
+	if !observability.IsValidLabels(filter.Labels) {
+		return false
+	}
+
+	rawDataString := []string{}
+	rawDataString = append(rawDataString, strings.Fields(observability.Resource)...)
+	rawDataString = append(rawDataString, strings.Fields(observability.Data)...)
+
+	data := map[string]string{}
+	for _, rawData := range rawDataString {
+		if strings.Contains(rawData, "=") {
+			dataSplit := strings.Split(rawData, "=")
+			key := dataSplit[0]
+			value := dataSplit[1]
+
+			data[key] = value
+		}
+	}
+
+	if filter.Syscall != "" {
+		value, found := data["syscall"]
+		if !found || value != string(filter.Syscall) {
+			return false
+		}
+	}
+
+	if filter.NetworkProtocol != "" {
+		value, found := data["protocol"]
+		if !found || !strings.EqualFold(value, filter.NetworkProtocol) {
+			return false
+		}
+	}
+
+	if filter.DestinationAddressIP != "" {
+		possibleKeys := []string{"sin_addr", "remoteip"}
+		foundOverall := false
+
+		for _, key := range possibleKeys {
+			value, found := data[key]
+
+			if found {
+				if value != filter.DestinationAddressIP {
+					return false
+				}
+
+				foundOverall = true
+				break
+			}
+		}
+
+		if !foundOverall {
+			return false
+		}
+	}
+
+	if filter.DestinationAddressIsSuspicious {
+		err := turnip.Setup(turnip.TurnipDefSrc)
+		if err != nil {
+			return false
+		}
+
+		destinationAddress, found := data["sin_addr"]
+		if !found {
+			return false
+		}
+
+		src, _ := turnip.AddressIsBlocked(destinationAddress)
+		return src != nil
+	}
+
+	return true
+}
+
+func (observability Observability) IsValidLabels(labels map[string]string) bool {
+	observabilityLabel := LabelsFromString(observability.Labels)
+
+	for filterKey, filterValue := range labels {
+		labelValue, isLabelKeyExist := observabilityLabel[filterKey]
+
+		if !isLabelKeyExist {
+			return false
+		}
+
+		match, _ := regexp.MatchString(filterValue, labelValue)
+		if match {
+			continue
+		}
+
+		if filterValue != labelValue {
+			return false
+		}
+	}
+
+	return true
 }

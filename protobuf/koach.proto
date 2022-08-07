@@ -44,6 +44,19 @@ message GetResponse {
     repeated ObservabilityData data = 1;
 }
 
+message ListenAlertRequest {
+    string namespace_id = 1;
+    string pod_id = 2;
+    string container_id = 3;
+}
+
+message ListenAlertResponse {
+    string message = 1;
+    int32 severity = 2;
+    ObservabilityData observability = 3;
+}
+
 service ObservabilityService {
     rpc Get(GetRequest) returns (GetResponse);
+    rpc ListenAlert(ListenAlertRequest) returns (stream ListenAlertResponse);
 }

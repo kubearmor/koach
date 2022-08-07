@@ -1,0 +1,15 @@
+apiVersion: security.kubearmor.com/v1
+kind: KubeArmorAlertRule
+metadata:
+  name: file-delete-alert-rule-example-1
+  namespace: multiubuntu
+spec:
+  operation: File
+  severity: 5
+  message: "alert mass file deletion"
+  condition:
+    occurrence:
+      count: 1
+    file:
+      path: test-delete-dir\/.*
+      action: delete

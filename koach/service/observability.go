@@ -7,7 +7,7 @@ import (
 
 type IObservabilityService interface {
 	Get(filter model.ObservabilityFilter) ([]model.Observability, error)
-	Save(observability model.Observability) error
+	Save(observability *model.Observability) error
 	DeleteByAgeSeconds(age int) error
 }
 
@@ -21,17 +21,17 @@ func (s *observabilityService) Get(filter model.ObservabilityFilter) ([]model.Ob
 		return nil, err
 	}
 
-	if filter.Labels != "" {
-		labelsFilter := model.LabelsFilter{}
-		labelsFilter.FromString(filter.Labels)
-
-		observabilities = model.FilterObservabilitiesByFilter(observabilities, labelsFilter)
+	finalObservabilities := []model.Observability{}
+	for _, observability := range observabilities {
+		if observability.IsValid(filter) {
+			finalObservabilities = append(finalObservabilities, observability)
+		}
 	}
 
-	return observabilities, nil
+	return finalObservabilities, nil
 }
 
-func (s *observabilityService) Save(observability model.Observability) error {
+func (s *observabilityService) Save(observability *model.Observability) error {
 	_, err := s.observabilityRepository.Save(observability)
 
 	return err

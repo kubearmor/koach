@@ -1,0 +1,18 @@
+apiVersion: security.kubearmor.com/v1
+kind: KubeArmorAlertRule
+metadata:
+  name: nmap-example-1
+  namespace: multiubuntu
+spec:
+  operation: Network
+  severity: 5
+  message: "alert nmap"
+  condition:
+    isSamePID: true
+    occurrence:
+      count: 150
+      timeframe: 5m
+    network:
+      protocol: TCP
+      destinationAddress:
+        ip: 192.168.1.1

@@ -48,7 +48,7 @@ func main() {
 
 	// get arguments
 	gRPCPortPtr := flag.String("gRPCPort", "3001", "gRPC port")
-	migrateDBPtr := flag.Bool("migrate", false, "migrate database")
+	migrateDBPtr := flag.Bool("migrate", true, "migrate database")
 	periodicDataDeletionAge := flag.String("periodic-data-deletion-age", "30d", "periodic data deletion age")
 	flag.Parse()
 
@@ -67,6 +67,11 @@ func main() {
 		}
 	}
 
+	// init k8s client
+	if !server.K8s.InitK8sClient() {
+		kg.Err("Failed to init K8s client")
+	}
+
 	// create koach server
 	koachServer := server.NewKoachServer(*gRPCPortPtr, database.DB)
 	if koachServer == nil {
@@ -74,6 +79,8 @@ func main() {
 		return
 	}
 	kg.Printf("Created a koach server (:%s)", *gRPCPortPtr)
+
+	go koachServer.WatchAlertRule()
 
 	go koachServer.GetFeedsFromRelay(config.C.Relay)
 
