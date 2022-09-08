@@ -44,6 +44,15 @@ message GetResponse {
     repeated ObservabilityData data = 1;
 }
 
+message ListenAlertRequest {}
+
+message ListenAlertResponse {
+    string message = 1;
+    int32 severity = 2;
+    ObservabilityData observability = 3;
+}
+
 service ObservabilityService {
     rpc Get(GetRequest) returns (GetResponse);
+    rpc ListenAlert(ListenAlertRequest) returns (stream ListenAlertResponse);
 }
