@@ -3,6 +3,9 @@
 Koach collects observability data from relay server and save it in database. Koach also provided gRPC method to query this data, which currently used by the KubeArmor CLI.
 Other than that, you can also specify alert rules which will be watched by Koach.
 
+## Prerequisites
+You need to have KubeArmor installed on your cluster to use Koach. Follow the guide on this [repository](https://github.com/kubearmor/KubeArmor) to install or deploy KubeArmor.
+
 ## Quick Install
 Deploy koach to your cluster using the following command.
 ```
@@ -17,7 +20,7 @@ kubectl apply -f https://raw.githubusercontent.com/nthnieljson/koach/alert-rule/
 ## How To Use
 
 ### Get Observability Data
-Use kubearmor cli to get the observability data that have been stored. To install the karmor cli tool, follow the link [here](https://github.com/kubearmor/kubearmor-client/#from-script). Currently there are 4 type of operations that koach support:
+Use KubeArmor cli to get the observability data that have been stored. To install the karmor cli tool, follow the link [here](https://github.com/kubearmor/kubearmor-client/#from-script). Currently there are 4 type of operations that koach support:
 - file
 - process
 - network
@@ -45,7 +48,7 @@ kubectl apply -f https://raw.githubusercontent.com/nthnieljson/koach/alert-rule/
 kubectl apply -f https://raw.githubusercontent.com/nthnieljson/koach/alert-rule/examples/alert-rule/suspicious-ip-alert-rule.yaml
 ```
 
-Koach provide a gRPC method that can be used to listen or watch alerts. Kubearmor cli also can be used to watch alert, which in the background are using the gRPC method that koach provided.
+Koach provide a gRPC method that can be used to listen or watch alerts. KubeArmor cli also can be used to watch alert, which in the background are using the gRPC method that koach provided.
 ```
 karmor observe alert
 ```
