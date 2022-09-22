@@ -25,8 +25,7 @@ Use kubearmor cli to get the observability data that have been stored. To instal
 
 Example, get all observabilities data for file operation on `multiubuntu` namespace and output it using a custom column.
 ```
-karmor observe file -n multiubuntu --custom-columns=Namespace:.namespace_name,Pod:.pod_name,Resource:.resou
-rce
+karmor observe file -n multiubuntu --custom-columns=Namespace:.namespace_name,Pod:.pod_name,Resource:.resource
 ```
 
 Example, get all observabilities data for process operation since the last 24 hour on all namespaces using specific labels.
