@@ -4,7 +4,12 @@ Koach collects observability data from relay server and save it in database. Koa
 Other than that, you can also specify alert rules which will be watched by Koach.
 
 ## Prerequisites
+
+### KubeArmor
 You need to have KubeArmor installed on your cluster to use Koach. Follow the guide on this [repository](https://github.com/kubearmor/KubeArmor) to install or deploy KubeArmor.
+
+### KubeArmor CLI
+To interact with Koach, please install the cli from [here](https://github.com/nthnieljson/kubearmor-client/tree/observe-cmd-init).
 
 ## Quick Install
 Deploy koach to your cluster using the following command.
