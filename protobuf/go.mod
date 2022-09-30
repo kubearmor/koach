@@ -1,4 +1,4 @@
-module github.com/nthnieljson/koach/protobuf
+module github.com/kubearmor/koach/protobuf
 
 go 1.18
 
