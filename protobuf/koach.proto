@@ -44,7 +44,11 @@ message GetResponse {
     repeated ObservabilityData data = 1;
 }
 
-message ListenAlertRequest {}
+message ListenAlertRequest {
+    string namespace_id = 1;
+    string pod_id = 2;
+    string container_id = 3;
+}
 
 message ListenAlertResponse {
     string message = 1;
