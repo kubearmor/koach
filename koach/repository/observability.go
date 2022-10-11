@@ -11,7 +11,7 @@ import (
 
 type IObservabilityRepository interface {
 	Get(filter model.ObservabilityFilter) ([]model.Observability, error)
-	Save(observability model.Observability) (*string, error)
+	Save(observability *model.Observability) (*string, error)
 	DeleteByAgeSeconds(age int) error
 }
 
@@ -39,6 +39,10 @@ func (r *observabilityRepository) Get(filter model.ObservabilityFilter) ([]model
 		query = query.Where("container_name = ?", filter.ContainerID)
 	}
 
+	if filter.PID != 0 {
+		query = query.Where("pid = ?", filter.PID)
+	}
+
 	if filter.SinceTimeSeconds != 0 {
 		query = query.Where(fmt.Sprintf("created_at BETWEEN DATETIME('now', '-%s second', 'localtime') AND DATETIME('now', 'localtime')", strconv.Itoa(filter.SinceTimeSeconds)))
 	}
@@ -51,10 +55,10 @@ func (r *observabilityRepository) Get(filter model.ObservabilityFilter) ([]model
 	return observabilities, nil
 }
 
-func (r *observabilityRepository) Save(observability model.Observability) (*string, error) {
+func (r *observabilityRepository) Save(observability *model.Observability) (*string, error) {
 	observability.ID = uuid.New().String()
 
-	err := r.db.Save(&observability).Error
+	err := r.db.Save(observability).Error
 	if err != nil {
 		return nil, err
 	}

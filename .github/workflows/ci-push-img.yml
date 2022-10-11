@@ -1,0 +1,25 @@
+name: Push KubeArmor Koach Image to Docker
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  push-docker-img:
+    name: Create and push docker image
+    if: github.repository == 'kubearmor/koach'
+    runs-on: ubuntu-18.04
+    timeout-minutes: 20
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+      - name: Generate artifacts
+        run: ./koach/build/build_img.sh
+      - name: Login to Docker Hub
+        uses: docker/login-action@v1
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_AUTHTOK }}
+      - name: Push images to Docker
+        run: ./koach/build/push_img.sh
+        

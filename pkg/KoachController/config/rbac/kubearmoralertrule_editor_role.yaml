@@ -1,0 +1,31 @@
+# permissions for end users to edit kubearmoralertrules.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/name: clusterrole
+    app.kubernetes.io/instance: kubearmoralertrule-editor-role
+    app.kubernetes.io/component: rbac
+    app.kubernetes.io/created-by: koachcontroller
+    app.kubernetes.io/part-of: koachcontroller
+    app.kubernetes.io/managed-by: kustomize
+  name: kubearmoralertrule-editor-role
+rules:
+- apiGroups:
+  - security.kubearmor.com
+  resources:
+  - kubearmoralertrules
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - security.kubearmor.com
+  resources:
+  - kubearmoralertrules/status
+  verbs:
+  - get

@@ -1,0 +1,16 @@
+apiVersion: security.kubearmor.com/v1
+kind: KubeArmorAlertRule
+metadata:
+  name: suspicious-ip-example-1
+  namespace: multiubuntu
+spec:
+  operation: Network
+  severity: 5
+  message: "alert suspicious ip"
+  condition:
+    occurrence:
+      count: 1
+      timeframe: 10m
+    network:
+      destinationAddress:
+        isSuspicious: true

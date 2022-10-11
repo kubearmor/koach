@@ -6,8 +6,5 @@ const (
 	OperationFileAccess   Operation = "File"
 	OperationProcessSpawn Operation = "Process"
 	OperationNetworkCall  Operation = "Network"
+	OperationSystemCall   Operation = "Syscall"
 )
-
-type OperationDetail interface {
-	IsOperationDetail()
-}
